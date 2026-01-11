@@ -105,7 +105,7 @@ def generate_mock_database(db_path: Path) -> None:
         )
         
         # Populate FTS5 index
-        conn.execute("INSERT INTO verses_fts(verse_id, book_id, text) SELECT id, book_id, text FROM verses")
+        conn.execute("INSERT INTO verses_fts(text, book_id) SELECT text, book_id FROM verses")
         
         conn.commit()
     

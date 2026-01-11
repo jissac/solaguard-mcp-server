@@ -118,17 +118,36 @@ async def search_scripture(
     """
     await ensure_database()
     
-    # TODO: Implement proper search in Task 4.2
-    # For now, return mock data to test the server
-    return {
-        "context": "Biblical search. Scripture authority.",
-        "theological_frame": "Protestant perspective. Scripture primary authority.",
-        "results": [],
-        "query": query,
-        "total_results": 0,
-        "books_found": [],
-        "testament_distribution": {"OT": 0, "NT": 0},
-    }
+    try:
+        from .tools.scripture_search import search_scripture_data, validate_search_translation, get_search_statistics
+        
+        # Validate translation
+        if not await validate_search_translation(translation):
+            stats = await get_search_statistics()
+            return {
+                "error": f"Translation '{translation}' not available for search",
+                "available_translations": stats.get("available_translations", []),
+                "suggestion": f"Try one of: {', '.join(stats.get('available_translations', []))}"
+            }
+        
+        # Validate limit
+        if limit < 1 or limit > 50:
+            return {
+                "error": "Limit must be between 1 and 50",
+                "suggestion": "Use a reasonable limit for better performance"
+            }
+        
+        # Perform search
+        return await search_scripture_data(query, translation, limit)
+        
+    except Exception as e:
+        logger.error(f"search_scripture failed: {e}")
+        return {
+            "error": str(e),
+            "context": "Biblical search. Scripture authority.",
+            "theological_frame": "Protestant perspective. Scripture primary authority.",
+            "suggestion": "Try simpler search terms or check spelling"
+        }
 
 
 def main():

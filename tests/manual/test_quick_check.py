@@ -47,8 +47,22 @@ async def quick_test():
             verse = result["verse"]
             print(f"   ✅ {verse['reference']}: {verse['text'][:50]}...")
         
-        # Test 5: MCP server tools
-        print("\n5️⃣ Testing MCP server tools...")
+        # Test 5: Scripture search
+        print("\n5️⃣ Testing scripture search...")
+        from solaguard.tools.scripture_search import search_scripture_data
+        search_result = await search_scripture_data("love", "KJV", 3)
+        if "error" in search_result:
+            print(f"   ⚠️  {search_result['error']}")
+        else:
+            total = search_result["metadata"]["total_results"]
+            returned = len(search_result["results"])
+            print(f"   ✅ Found {total} verses, returned {returned}")
+            if returned > 0:
+                first = search_result["results"][0]
+                print(f"   📖 {first['reference']}: {first['text'][:40]}...")
+        
+        # Test 6: MCP server tools
+        print("\n6️⃣ Testing MCP server tools...")
         from solaguard.server import mcp
         try:
             tools = await mcp.get_tools()
@@ -71,6 +85,10 @@ async def quick_test():
             # Test get_verse tool if available
             if any('get_verse' in str(tool) for tool in (tools or [])):
                 print("   ✅ get_verse tool is registered")
+            
+            # Test search_scripture tool if available
+            if any('search_scripture' in str(tool) for tool in (tools or [])):
+                print("   ✅ search_scripture tool is registered")
         except Exception as e:
             print(f"   ⚠️  Could not check MCP tools: {e}")
         

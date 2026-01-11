@@ -52,9 +52,8 @@ CREATE INDEX IF NOT EXISTS idx_verses_translation ON verses(translation_id);
 
 -- FTS5 virtual table for full-text search
 CREATE VIRTUAL TABLE IF NOT EXISTS verses_fts USING fts5(
-    verse_id,
-    book_id,                       -- Enable book-specific search
     text,
+    book_id UNINDEXED,            -- Store book_id but don't index it for search
     content='verses',
     content_rowid='id'
 );
