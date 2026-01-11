@@ -11,6 +11,7 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 from .context import wrap_error_response, ContextType
+from .validation import ValidationError, validate_biblical_reference, validate_translation, validate_search_query, validate_search_limit
 
 # Configure logging
 log_level = os.getenv("SOLAGUARD_LOG_LEVEL", "INFO").upper()
@@ -76,19 +77,21 @@ async def get_verse(
     await ensure_database()
     
     try:
-        from .tools.verse_retrieval import get_verse_data, validate_translation_exists, get_available_translations
+        # Validate inputs using centralized validation
+        try:
+            validated_ref = await validate_biblical_reference(reference)
+            validated_translation = await validate_translation(translation)
+        except ValidationError as e:
+            return wrap_error_response(
+                e.message,
+                e.suggestion,
+                ContextType.VERSE_RETRIEVAL
+            )
         
-        # Validate translation
-        if not await validate_translation_exists(translation):
-            available = await get_available_translations()
-            return {
-                "error": f"Translation '{translation}' not available",
-                "available_translations": available,
-                "suggestion": f"Try one of: {', '.join(available)}"
-            }
+        from .tools.verse_retrieval import get_verse_data
         
-        # Retrieve verse data
-        return await get_verse_data(reference, translation, include_interlinear)
+        # Tool function handles the actual retrieval
+        return await get_verse_data(reference, validated_translation, include_interlinear)
         
     except Exception as e:
         logger.error(f"get_verse failed: {e}")
@@ -119,26 +122,22 @@ async def search_scripture(
     await ensure_database()
     
     try:
-        from .tools.scripture_search import search_scripture_data, validate_search_translation, get_search_statistics
+        # Validate inputs using centralized validation
+        try:
+            validated_query = validate_search_query(query)
+            validated_translation = await validate_translation(translation)
+            validated_limit = validate_search_limit(limit)
+        except ValidationError as e:
+            return wrap_error_response(
+                e.message,
+                e.suggestion,
+                ContextType.SCRIPTURE_SEARCH
+            )
         
-        # Validate translation
-        if not await validate_search_translation(translation):
-            stats = await get_search_statistics()
-            return {
-                "error": f"Translation '{translation}' not available for search",
-                "available_translations": stats.get("available_translations", []),
-                "suggestion": f"Try one of: {', '.join(stats.get('available_translations', []))}"
-            }
+        from .tools.scripture_search import search_scripture_data
         
-        # Validate limit
-        if limit < 1 or limit > 50:
-            return {
-                "error": "Limit must be between 1 and 50",
-                "suggestion": "Use a reasonable limit for better performance"
-            }
-        
-        # Perform search
-        return await search_scripture_data(query, translation, limit)
+        # Tool function handles the actual search with validated inputs
+        return await search_scripture_data(validated_query, validated_translation, validated_limit)
         
     except Exception as e:
         logger.error(f"search_scripture failed: {e}")

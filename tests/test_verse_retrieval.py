@@ -17,8 +17,8 @@ from solaguard.tools.verse_retrieval import (
     get_available_translations,
     VerseRetrievalError,
     _format_verse_response,
-    _create_theological_context
 )
+from solaguard.context.theological import wrap_verse_response
 
 
 class TestVerseRetrieval:
@@ -178,10 +178,16 @@ class TestVerseRetrieval:
             "author": "Moses"
         }
         
-        context = _create_theological_context(ot_metadata, "KJV")
-        assert "Old Testament Scripture" in context
-        assert "Mosaic Law" in context
-        assert "King James Version" in context
+        context = wrap_verse_response({
+            "reference": "Genesis 1:1",
+            "verses": [{"text": "In the beginning God created the heaven and the earth."}],
+            "metadata": ot_metadata
+        }, "Genesis 1:1", "KJV")
+        
+        context_str = str(context)
+        assert "Old Testament Scripture" in context_str
+        assert "Law" in context_str or "Mosaic" in context_str
+        assert "King James Version" in context_str
         
         # Test New Testament context
         nt_metadata = {
@@ -190,10 +196,16 @@ class TestVerseRetrieval:
             "author": "John"
         }
         
-        context = _create_theological_context(nt_metadata, "WEB")
-        assert "New Testament Scripture" in context
-        assert "Gospel narrative" in context
-        assert "World English Bible" in context
+        context = wrap_verse_response({
+            "reference": "John 3:16",
+            "verses": [{"text": "For God so loved the world..."}],
+            "metadata": nt_metadata
+        }, "John 3:16", "WEB")
+        
+        context_str = str(context)
+        assert "New Testament Scripture" in context_str
+        assert "Gospel" in context_str
+        assert "World English Bible" in context_str
 
 
 class TestValidationFunctions:

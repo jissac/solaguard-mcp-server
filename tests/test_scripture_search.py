@@ -12,10 +12,10 @@ from unittest.mock import AsyncMock, patch
 from src.solaguard.tools.scripture_search import (
     search_scripture_data,
     ScriptureSearchError,
-    _sanitize_search_query,
     validate_search_translation,
     get_search_statistics,
 )
+from src.solaguard.validation.validators import sanitize_search_query
 
 
 class TestQuerySanitization:
@@ -23,37 +23,37 @@ class TestQuerySanitization:
     
     def test_basic_query_sanitization(self):
         """Test basic query cleaning."""
-        assert _sanitize_search_query("love") == "love"
-        assert _sanitize_search_query("  love  ") == "love"
-        assert _sanitize_search_query("") == ""
-        assert _sanitize_search_query("   ") == ""
+        assert sanitize_search_query("love") == "love"
+        assert sanitize_search_query("  love  ") == "love"
+        assert sanitize_search_query("") == ""
+        assert sanitize_search_query("   ") == ""
     
     def test_quoted_phrase_preservation(self):
         """Test that quoted phrases are preserved."""
-        assert _sanitize_search_query('"love one another"') == '"love one another"'
-        assert _sanitize_search_query('love "one another" peace') == 'love "one another" peace'
+        assert sanitize_search_query('"love one another"') == '"love one another"'
+        assert sanitize_search_query('love "one another" peace') == 'love "one another" peace'
     
     def test_boolean_operator_preservation(self):
         """Test that boolean operators are preserved."""
-        assert _sanitize_search_query("love AND peace") == "love AND peace"
-        assert _sanitize_search_query("love OR joy") == "love OR joy"
-        assert _sanitize_search_query("love NOT hate") == "love NOT hate"
+        assert sanitize_search_query("love AND peace") == "love AND peace"
+        assert sanitize_search_query("love OR joy") == "love OR joy"
+        assert sanitize_search_query("love NOT hate") == "love NOT hate"
     
     def test_dangerous_character_removal(self):
         """Test that potentially dangerous characters are removed."""
         # Test SQL injection attempts
-        assert ";" not in _sanitize_search_query("love; DROP TABLE verses;")
-        assert "'" not in _sanitize_search_query("love' OR 1=1--")
+        assert ";" not in sanitize_search_query("love; DROP TABLE verses;")
+        assert "'" not in sanitize_search_query("love' OR 1=1--")
         
         # Test FTS5 injection attempts
         dangerous_query = "love NEAR/5 peace"
-        sanitized = _sanitize_search_query(dangerous_query)
+        sanitized = sanitize_search_query(dangerous_query)
         assert "NEAR" not in sanitized or sanitized == dangerous_query  # Either removed or kept if safe
     
     def test_empty_after_sanitization(self):
         """Test queries that become empty after sanitization."""
-        assert _sanitize_search_query(";;;") == ""
-        assert _sanitize_search_query("'''") == ""
+        assert sanitize_search_query(";;;") == ""
+        assert sanitize_search_query("'''") == ""
 
 
 class TestSearchValidation:

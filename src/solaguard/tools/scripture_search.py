@@ -29,9 +29,9 @@ async def search_scripture_data(
     Full-text search across biblical content with enhanced metadata.
     
     Args:
-        query: Search terms (supports phrases with quotes, boolean operators)
-        translation: Translation to search
-        limit: Maximum results to return
+        query: Search terms (already validated and sanitized)
+        translation: Translation to search (already validated)
+        limit: Maximum results to return (already validated)
     
     Returns:
         Search results with book metadata for AI analysis
@@ -40,10 +40,8 @@ async def search_scripture_data(
         ScriptureSearchError: If search fails
     """
     try:
-        # Validate and sanitize query
-        sanitized_query = _sanitize_search_query(query)
-        if not sanitized_query:
-            raise ScriptureSearchError("Empty or invalid search query")
+        # Query is already validated and sanitized at server level
+        sanitized_query = query
         
         # Get database manager
         db_manager = get_database_manager()
@@ -67,48 +65,6 @@ async def search_scripture_data(
     except Exception as e:
         logger.error(f"Scripture search failed for '{query}': {e}")
         raise ScriptureSearchError(f"Search failed: {e}")
-
-
-def _sanitize_search_query(query: str) -> str:
-    """
-    Sanitize search query to prevent FTS5 injection and ensure valid syntax.
-    
-    Args:
-        query: Raw search query
-        
-    Returns:
-        Sanitized query safe for FTS5
-    """
-    if not query or not query.strip():
-        return ""
-    
-    # Remove potentially dangerous characters but preserve search functionality
-    query = query.strip()
-    
-    # Handle quoted phrases (preserve them)
-    quoted_phrases = re.findall(r'"([^"]*)"', query)
-    
-    # Remove quotes temporarily and clean the rest
-    query_without_quotes = re.sub(r'"[^"]*"', "QUOTED_PHRASE", query)
-    
-    # Remove or escape potentially dangerous FTS5 characters
-    # Keep: letters, numbers, spaces, basic punctuation, boolean operators
-    query_without_quotes = re.sub(r'[^\w\s\-\.\,\!\?\:\;\(\)\'\"ANDORNOT]', ' ', query_without_quotes)
-    
-    # Restore quoted phrases
-    for phrase in quoted_phrases:
-        # Clean the phrase content
-        clean_phrase = re.sub(r'[^\w\s\-\.\,\!\?\:\;\(\)\'\"ANDORNOT]', ' ', phrase)
-        query_without_quotes = query_without_quotes.replace("QUOTED_PHRASE", f'"{clean_phrase}"', 1)
-    
-    # Normalize whitespace
-    query = re.sub(r'\s+', ' ', query_without_quotes).strip()
-    
-    # Ensure query is not empty after sanitization
-    if not query or query.isspace():
-        return ""
-    
-    return query
 
 
 async def _execute_fts5_search(

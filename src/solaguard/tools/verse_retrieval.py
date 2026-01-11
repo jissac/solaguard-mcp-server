@@ -47,7 +47,7 @@ async def get_verse_data(
         VerseRetrievalError: If verse retrieval fails
     """
     try:
-        # Parse the reference
+        # Parse the reference (validation handled at server level)
         parsed_ref = parse_reference(reference)
         
         # Get database manager
@@ -60,7 +60,11 @@ async def get_verse_data(
             verses = await _get_verse_range(db_manager, parsed_ref, translation)
         
         if not verses:
-            raise VerseRetrievalError(f"No verses found for reference '{reference}' in translation '{translation}'")
+            return wrap_error_response(
+                f"No verses found for reference '{reference}' in {translation}",
+                "The reference exists but no verse text is available in this translation",
+                ContextType.VERSE_RETRIEVAL
+            )
         
         # Get book metadata
         book_metadata = await _get_book_metadata(db_manager, parsed_ref.book_id)
@@ -75,7 +79,11 @@ async def get_verse_data(
         )
         
     except ReferenceParseError as e:
-        raise VerseRetrievalError(f"Invalid reference format: {e}")
+        return wrap_error_response(
+            f"Invalid reference format: {e}",
+            "Please use format like 'John 3:16' or 'Romans 8:28-30'",
+            ContextType.VERSE_RETRIEVAL
+        )
     except Exception as e:
         logger.error(f"Verse retrieval failed for '{reference}': {e}")
         raise VerseRetrievalError(f"Failed to retrieve verse: {e}")
