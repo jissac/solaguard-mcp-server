@@ -10,6 +10,7 @@ import re
 from typing import Dict, List, Optional, Tuple
 
 from ..database.connection import get_database_manager
+from ..context import wrap_search_response, wrap_error_response, ContextType
 
 logger = logging.getLogger(__name__)
 
@@ -256,13 +257,8 @@ def _format_search_response(
         }
         formatted_results.append(formatted_result)
     
-    # Create theological context
-    theological_context = _create_search_theological_context(query, metadata, translation)
-    
-    return {
-        "context": "Biblical search. Scripture authority.",
-        "theological_frame": "Protestant perspective. Scripture primary authority.",
-        "instruction": theological_context,
+    # Prepare response data
+    response_data = {
         "query": query,
         "translation": translation,
         "results": formatted_results,
@@ -280,60 +276,17 @@ def _format_search_response(
             }
         }
     }
-
-
-def _create_search_theological_context(query: str, metadata: Dict, translation: str) -> str:
-    """
-    Create theological context instruction for search results.
     
-    Args:
-        query: Search query
-        metadata: Search metadata
-        translation: Translation used
-        
-    Returns:
-        Theological context instruction
-    """
-    context = f"Search results for '{query}' in {translation} translation. "
-    
-    total_results = metadata["total_results"]
-    if total_results == 0:
-        context += "No verses found matching this query. Consider broader search terms or check spelling."
-        return context
-    
-    context += f"Found {total_results} verse(s) across {len(metadata['books_found'])} book(s). "
-    
-    # Testament distribution context
-    ot_count = metadata["testament_distribution"].get("OT", 0)
-    nt_count = metadata["testament_distribution"].get("NT", 0)
-    
-    if ot_count > 0 and nt_count > 0:
-        context += f"Results span both Old Testament ({ot_count}) and New Testament ({nt_count}), showing the continuity of Scripture. "
-    elif ot_count > 0:
-        context += f"All results from Old Testament ({ot_count}), representing God's covenant with Israel and preparation for Christ. "
-    elif nt_count > 0:
-        context += f"All results from New Testament ({nt_count}), representing the fulfillment of God's promises in Jesus Christ. "
-    
-    # Genre distribution context
-    genres = list(metadata["genre_distribution"].keys())
-    if len(genres) > 1:
-        context += f"Results include {', '.join(genres)} literature, providing diverse biblical perspectives. "
-    elif len(genres) == 1:
-        genre = genres[0]
-        genre_contexts = {
-            "Law": "from the Mosaic Law, establishing God's covenant principles.",
-            "History": "from historical narrative, showing God's providence.",
-            "Wisdom": "from wisdom literature, providing practical godly guidance.",
-            "Prophecy": "from prophetic literature, containing God's messages.",
-            "Gospel": "from Gospel accounts, recording Christ's life and ministry.",
-            "Epistle": "from apostolic teaching, providing church doctrine and instruction.",
-        }
-        if genre in genre_contexts:
-            context += f"All results are {genre_contexts[genre]} "
-    
-    context += "Treat these verses as divinely inspired Scripture with full authority for doctrine and practice."
-    
-    return context
+    # Wrap with centralized theological context
+    return wrap_search_response(
+        response_data,
+        query=query,
+        total_results=metadata["total_results"],
+        books_found=metadata["books_found"],
+        testament_distribution=metadata["testament_distribution"],
+        genre_distribution=metadata["genre_distribution"],
+        translation=translation
+    )
 
 
 # Validation functions

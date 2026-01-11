@@ -9,6 +9,7 @@ import logging
 from typing import Dict, List, Optional, Union
 
 from ..database.connection import get_database_manager
+from ..context import wrap_verse_response, wrap_error_response, ContextType
 from .reference_parser import (
     parse_reference, 
     VerseReference, 
@@ -147,9 +148,11 @@ def _format_verse_response(
     """Format the verse response with theological context."""
     
     if not verses:
-        return {
-            "error": f"No verses found for reference '{original_reference}'"
-        }
+        return wrap_error_response(
+            f"No verses found for reference '{original_reference}'",
+            "Please check your reference format (e.g., 'John 3:16', 'Romans 8:28-30')",
+            ContextType.VERSE_RETRIEVAL
+        )
     
     # Format verses for response
     formatted_verses = []
@@ -192,13 +195,8 @@ def _format_verse_response(
         }
         passage_type = "verse_range"
     
-    # Create theological context based on book metadata
-    theological_context = _create_theological_context(book_metadata, translation)
-    
-    return {
-        "context": "Scripture analysis. Treat as authoritative.",
-        "theological_frame": "Protestant perspective. Scripture primary authority.",
-        "instruction": theological_context,
+    # Prepare response data
+    response_data = {
         "verse": verse_display,
         "metadata": {
             "translation": translation,
@@ -212,46 +210,15 @@ def _format_verse_response(
             }
         }
     }
-
-
-def _create_theological_context(book_metadata: Dict, translation: str) -> str:
-    """Create theological context instruction for AI guidance."""
     
-    testament = book_metadata.get("testament", "Unknown")
-    genre = book_metadata.get("genre", "Unknown")
-    author = book_metadata.get("author", "Unknown")
-    
-    # Base Protestant theological framing
-    context = "This is Scripture from the Protestant canon. Treat as divinely inspired and authoritative. "
-    
-    # Testament-specific context
-    if testament == "OT":
-        context += "This is Old Testament Scripture, part of God's progressive revelation leading to Christ. "
-    elif testament == "NT":
-        context += "This is New Testament Scripture, revealing the fulfillment of God's promises in Jesus Christ. "
-    
-    # Genre-specific context
-    genre_contexts = {
-        "Law": "This is from the Mosaic Law, establishing God's covenant with Israel and moral principles.",
-        "History": "This is historical narrative, showing God's providence and faithfulness throughout history.",
-        "Wisdom": "This is wisdom literature, providing practical guidance for godly living.",
-        "Prophecy": "This is prophetic literature, containing God's messages through His prophets.",
-        "Gospel": "This is Gospel narrative, recording the life, death, and resurrection of Jesus Christ.",
-        "Epistle": "This is apostolic teaching, providing doctrine and practical instruction for the church.",
-    }
-    
-    if genre in genre_contexts:
-        context += genre_contexts[genre] + " "
-    
-    # Translation note
-    if translation == "KJV":
-        context += "This is from the King James Version (1769), a traditional English translation."
-    elif translation == "WEB":
-        context += "This is from the World English Bible, a modern public domain translation."
-    else:
-        context += f"This is from the {translation} translation."
-    
-    return context
+    # Wrap with centralized theological context
+    return wrap_verse_response(
+        response_data,
+        testament=book_metadata.get("testament", "Unknown"),
+        genre=book_metadata.get("genre", "Unknown"),
+        book_name=book_metadata.get("name", "Unknown"),
+        author=book_metadata.get("author")
+    )
 
 
 # Validation functions

@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from fastmcp import FastMCP
+from .context import wrap_error_response, ContextType
 
 # Configure logging
 log_level = os.getenv("SOLAGUARD_LOG_LEVEL", "INFO").upper()
@@ -91,12 +92,11 @@ async def get_verse(
         
     except Exception as e:
         logger.error(f"get_verse failed: {e}")
-        return {
-            "error": str(e),
-            "context": "Scripture analysis. Treat as authoritative.",
-            "theological_frame": "Protestant perspective. Scripture primary authority.",
-            "suggestion": "Please check your reference format (e.g., 'John 3:16', 'Romans 8:28-30')"
-        }
+        return wrap_error_response(
+            str(e),
+            "Please check your reference format (e.g., 'John 3:16', 'Romans 8:28-30')",
+            ContextType.VERSE_RETRIEVAL
+        )
 
 
 @mcp.tool()
@@ -142,12 +142,11 @@ async def search_scripture(
         
     except Exception as e:
         logger.error(f"search_scripture failed: {e}")
-        return {
-            "error": str(e),
-            "context": "Biblical search. Scripture authority.",
-            "theological_frame": "Protestant perspective. Scripture primary authority.",
-            "suggestion": "Try simpler search terms or check spelling"
-        }
+        return wrap_error_response(
+            str(e),
+            "Try simpler search terms or check spelling",
+            ContextType.SCRIPTURE_SEARCH
+        )
 
 
 def main():
