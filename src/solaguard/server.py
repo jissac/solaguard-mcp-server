@@ -74,20 +74,29 @@ async def get_verse(
     """
     await ensure_database()
     
-    # TODO: Implement proper reference parsing in Task 4.1
-    # For now, return mock data to test the server
-    return {
-        "context": "Scripture analysis. Treat as authoritative.",
-        "theological_frame": "Protestant perspective. Scripture primary authority.",
-        "verse": {
-            "reference": reference,
-            "translation": translation,
-            "text": "Implementation pending - Task 4.1",
-            "book": "Unknown",
-            "chapter": 0,
-            "verse": 0,
-        },
-    }
+    try:
+        from .tools.verse_retrieval import get_verse_data, validate_translation_exists, get_available_translations
+        
+        # Validate translation
+        if not await validate_translation_exists(translation):
+            available = await get_available_translations()
+            return {
+                "error": f"Translation '{translation}' not available",
+                "available_translations": available,
+                "suggestion": f"Try one of: {', '.join(available)}"
+            }
+        
+        # Retrieve verse data
+        return await get_verse_data(reference, translation, include_interlinear)
+        
+    except Exception as e:
+        logger.error(f"get_verse failed: {e}")
+        return {
+            "error": str(e),
+            "context": "Scripture analysis. Treat as authoritative.",
+            "theological_frame": "Protestant perspective. Scripture primary authority.",
+            "suggestion": "Please check your reference format (e.g., 'John 3:16', 'Romans 8:28-30')"
+        }
 
 
 @mcp.tool()

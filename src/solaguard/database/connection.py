@@ -106,9 +106,13 @@ class DatabaseManager:
                 cursor = await conn.execute("SELECT COUNT(*) FROM verses")
                 verse_count = (await cursor.fetchone())[0]
                 
-                # Test FTS5 search
-                cursor = await conn.execute("SELECT COUNT(*) FROM verses_fts")
-                fts_count = (await cursor.fetchone())[0]
+                # Test FTS5 search - check if table exists first
+                try:
+                    cursor = await conn.execute("SELECT COUNT(*) FROM verses_fts")
+                    fts_count = (await cursor.fetchone())[0]
+                except Exception:
+                    # FTS5 table might not exist or be empty
+                    fts_count = 0
                 
                 # Get database file size
                 db_size = self.db_path.stat().st_size
@@ -126,6 +130,10 @@ class DatabaseManager:
             return {
                 "status": "unhealthy",
                 "error": str(e),
+                "verse_count": 0,
+                "fts_index_count": 0,
+                "database_size_mb": 0,
+                "max_connections": self.max_connections,
             }
     
     async def get_database_stats(self) -> dict:
