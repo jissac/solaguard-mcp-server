@@ -1,0 +1,5 @@
+# This directory will contain Bible text data and generated databases
+# Files in this directory:
+# - Source Bible texts (JSON/XML formats)
+# - Generated SQLite database (bible.db)
+# - Ingestion pipeline outputs

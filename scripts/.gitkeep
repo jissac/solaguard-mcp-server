@@ -1,0 +1,6 @@
+# This directory will contain data ingestion pipeline scripts
+# Files in this directory:
+# - Mock data generator
+# - Bible text parsers (KJV, WEB, etc.)
+# - Database creation scripts
+# - Migration utilities
