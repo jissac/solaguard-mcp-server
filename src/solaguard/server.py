@@ -10,6 +10,12 @@ import sys
 from pathlib import Path
 
 from fastmcp import FastMCP
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
 from .context import wrap_error_response, ContextType
 from .validation import ValidationError, validate_biblical_reference, validate_translation, validate_search_query, validate_search_limit
 
@@ -28,8 +34,80 @@ logger = logging.getLogger(__name__)
 # Initialize FastMCP server
 mcp = FastMCP("SolaGuard")
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
+# Store reference to the HTTP app
+_http_app = None
+
 # Global database manager
 _db_manager = None
+
+
+def setup_rate_limiting():
+    """Setup rate limiting on the FastMCP server."""
+    global _http_app
+    try:
+        # Get the underlying HTTP app from FastMCP
+        _http_app = mcp.http_app()
+        
+        logger.info(f"HTTP app type: {type(_http_app)}")
+        logger.info(f"HTTP app has state: {hasattr(_http_app, 'state')}")
+        
+        # Configure rate limiter
+        _http_app.state.limiter = limiter
+        logger.info("✅ Limiter added to app state")
+        
+        # Add custom rate limit exceeded handler
+        async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+            """Custom handler for rate limit exceeded errors."""
+            logger.warning(f"Rate limit exceeded for {get_remote_address(request)}: {exc.detail}")
+            
+            # Return user-friendly error message
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "Rate limit exceeded",
+                    "message": "Too many requests. Please try again in a few seconds.",
+                    "suggestion": "Normal usage is 2-3 requests per minute. Please wait before making more requests.",
+                    "retry_after": "60 seconds",
+                    "context": "SolaGuard MCP Server protects against abuse while serving legitimate users."
+                }
+            )
+        
+        # Add the exception handler
+        _http_app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+        logger.info("✅ Exception handler added")
+        
+        # Add rate limiting middleware using the new approach
+        from starlette.middleware.base import BaseHTTPMiddleware
+        
+        class RateLimitMiddleware(BaseHTTPMiddleware):
+            async def dispatch(self, request: Request, call_next):
+                try:
+                    # Check rate limit
+                    await limiter.check_request(request, "20/minute")
+                    response = await call_next(request)
+                    return response
+                except RateLimitExceeded as e:
+                    return await rate_limit_handler(request, e)
+        
+        _http_app.add_middleware(RateLimitMiddleware)
+        logger.info("✅ Middleware added")
+        
+        logger.info("🛡️ Rate limiting configured: 20 requests per minute per IP")
+        
+    except Exception as e:
+        logger.error(f"Failed to setup rate limiting: {e}")
+        import traceback
+        traceback.print_exc()
+        # Don't fail startup if rate limiting setup fails
+        pass
+
+
+def get_http_app():
+    """Get the configured HTTP app."""
+    return _http_app
 
 
 async def ensure_database():
@@ -152,6 +230,9 @@ def main():
     """Main entry point for the SolaGuard MCP server."""
     logger.info("Starting SolaGuard MCP Server")
     logger.info("Bible-Anchored Theology — Sola Scriptura Enforced")
+    
+    # Setup rate limiting
+    setup_rate_limiting()
     
     # Run the MCP server
     mcp.run()
