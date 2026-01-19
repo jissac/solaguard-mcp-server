@@ -172,6 +172,10 @@ data/*.sqlite3
 logs/
 *.log
 
+# Lexicon data files (too many for git)
+data/lexicon/greek/*.md
+data/lexicon/hebrew/*.md
+
 # Development databases
 test.db
 dev.db

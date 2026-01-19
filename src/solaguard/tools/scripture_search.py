@@ -161,7 +161,8 @@ async def _get_search_metadata(
                 f"SELECT id, name FROM books WHERE id IN ({placeholders}) ORDER BY canonical_order",
                 books_found
             )
-            book_names = dict(await cursor.fetchall())
+            rows = await cursor.fetchall()
+            book_names = {row["id"]: row["name"] for row in rows}
         else:
             book_names = {}
     

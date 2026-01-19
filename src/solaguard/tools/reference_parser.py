@@ -55,10 +55,15 @@ BOOK_MAPPINGS = {
     "ruth": "RUT", "rut": "RUT", "ru": "RUT", "rth": "RUT",
     "1samuel": "1SA", "1sam": "1SA", "1sa": "1SA", "1s": "1SA", "1 samuel": "1SA", "1 sam": "1SA",
     "2samuel": "2SA", "2sam": "2SA", "2sa": "2SA", "2s": "2SA", "2 samuel": "2SA", "2 sam": "2SA",
+    "sa": "1SA",  # Common abbreviation for Samuel (assume 1 Samuel)
+    "sam": "1SA", # Another Samuel abbreviation
     "1kings": "1KI", "1king": "1KI", "1ki": "1KI", "1k": "1KI", "1 kings": "1KI", "1 king": "1KI",
     "2kings": "2KI", "2king": "2KI", "2ki": "2KI", "2k": "2KI", "2 kings": "2KI", "2 king": "2KI",
+    "ki": "1KI",  # Default KI to 1 Kings
     "1chronicles": "1CH", "1chron": "1CH", "1chr": "1CH", "1ch": "1CH", "1 chronicles": "1CH", "1 chron": "1CH",
     "2chronicles": "2CH", "2chron": "2CH", "2chr": "2CH", "2ch": "2CH", "2 chronicles": "2CH", "2 chron": "2CH",
+    "ch": "1CH",  # Common abbreviation for Chronicles (assume 1 Chronicles)
+    "chr": "1CH", # Another Chronicles abbreviation
     "ezra": "EZR", "ezr": "EZR", "ez": "EZR",
     "nehemiah": "NEH", "neh": "NEH", "ne": "NEH",
     "esther": "EST", "est": "EST", "es": "EST",
@@ -78,7 +83,7 @@ BOOK_MAPPINGS = {
     "obadiah": "OBA", "obad": "OBA", "oba": "OBA", "ob": "OBA",
     "jonah": "JON", "jon": "JON", "jnh": "JON",
     "micah": "MIC", "mic": "MIC", "mi": "MIC",
-    "nahum": "NAM", "nah": "NAM", "na": "NAM",
+    "nahum": "NAM", "nah": "NAM", "na": "NAM", "nam": "NAM",
     "habakkuk": "HAB", "hab": "HAB", "hb": "HAB",
     "zephaniah": "ZEP", "zeph": "ZEP", "zep": "ZEP", "zp": "ZEP",
     "haggai": "HAG", "hag": "HAG", "hg": "HAG",
@@ -176,6 +181,10 @@ def parse_reference(reference: str) -> Union[VerseReference, VerseRange]:
     - "Romans 8:28-30" -> verse range
     - "1 Cor 13:4-7" -> verse range
     - "Psalm 23:1" -> single verse
+    - "EXO 6:16-20" -> verse range (Nave's format)
+    - "JOS 21:4,10" -> multiple verses (treated as range)
+    - "DEU 29" -> entire chapter (treated as verse 1)
+    - "JOS 4" -> entire chapter (treated as verse 1)
     
     Args:
         reference: Biblical reference string
@@ -191,18 +200,49 @@ def parse_reference(reference: str) -> Union[VerseReference, VerseRange]:
     
     reference = reference.strip()
     
-    # Pattern for biblical references
-    # Supports: "Book Chapter:Verse" or "Book Chapter:StartVerse-EndVerse"
-    pattern = r'^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$'
+    # Handle special cases from Nave's format
+    # Convert comma-separated verses to ranges for simplicity
+    if ',' in reference and ':' in reference:
+        # Format like "JOS 21:4,10" -> treat as range "JOS 21:4-10"
+        parts = reference.split(',')
+        if len(parts) == 2:
+            base_ref = parts[0].strip()
+            second_verse = parts[1].strip()
+            # If second part is just a number, create a range
+            if second_verse.isdigit():
+                reference = f"{base_ref}-{second_verse}"
     
-    match = re.match(pattern, reference)
-    if not match:
+    # Try chapter-only pattern first: "Book Chapter" (e.g., "DEU 29", "JOS 4")
+    chapter_only_pattern = r'^(.+?)\s+(\d+)$'
+    chapter_match = re.match(chapter_only_pattern, reference)
+    
+    if chapter_match:
+        book_name, chapter_str = chapter_match.groups()
+        try:
+            book_id = normalize_book_name(book_name)
+            chapter = int(chapter_str)
+            
+            if chapter < 1:
+                raise ReferenceParseError(f"Invalid chapter number: {chapter}")
+            
+            # For chapter-only references, return verse 1 of that chapter
+            return VerseReference(book_id, chapter, 1)
+            
+        except ValueError as e:
+            raise ReferenceParseError(f"Invalid number in reference: {e}")
+    
+    # Pattern for biblical references with verses
+    # Supports: "Book Chapter:Verse" or "Book Chapter:StartVerse-EndVerse"
+    verse_pattern = r'^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$'
+    
+    verse_match = re.match(verse_pattern, reference)
+    if not verse_match:
         raise ReferenceParseError(
             f"Invalid reference format: '{reference}'. "
-            f"Expected format: 'Book Chapter:Verse' (e.g., 'John 3:16', 'Romans 8:28-30')"
+            f"Expected format: 'Book Chapter:Verse' or 'Book Chapter' (e.g., 'John 3:16', 'Romans 8:28-30', 'DEU 29')"
         )
     
-    book_name, chapter_str, start_verse_str, end_verse_str = match.groups()
+    book_name, chapter_str, start_verse_str, end_verse_str = verse_match.groups()
     
     try:
         book_id = normalize_book_name(book_name)

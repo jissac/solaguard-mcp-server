@@ -155,17 +155,17 @@ class DatabaseManager:
                 
                 # Available translations
                 cursor = await conn.execute("SELECT id, name FROM translations ORDER BY id")
-                stats["available_translations"] = dict(await cursor.fetchall())
+                stats["available_translations"] = {row["id"]: row["name"] for row in await cursor.fetchall()}
                 
                 # Testament distribution
-                cursor = await conn.execute("SELECT testament, COUNT(*) FROM books GROUP BY testament")
-                stats["testament_distribution"] = dict(await cursor.fetchall())
+                cursor = await conn.execute("SELECT testament, COUNT(*) as count FROM books GROUP BY testament")
+                stats["testament_distribution"] = {row["testament"]: row["count"] for row in await cursor.fetchall()}
                 
                 # Most recent verses (if any)
                 cursor = await conn.execute(
                     "SELECT book_id, COUNT(*) as verse_count FROM verses GROUP BY book_id ORDER BY verse_count DESC LIMIT 5"
                 )
-                stats["top_books_by_verse_count"] = dict(await cursor.fetchall())
+                stats["top_books_by_verse_count"] = {row["book_id"]: row["verse_count"] for row in await cursor.fetchall()}
                 
                 return stats
                 

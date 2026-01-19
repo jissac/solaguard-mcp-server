@@ -25,7 +25,7 @@ logging.basicConfig(
     level=getattr(logging, log_level),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.StreamHandler(sys.stdout),
+        logging.StreamHandler(sys.stderr),
     ],
 )
 
@@ -121,7 +121,7 @@ async def ensure_database():
         # Initialize database connection
         from .database import initialize_database, get_database_manager
         
-        db_path = Path(os.getenv("SOLAGUARD_DATABASE_PATH", "data/bible_mock.db"))
+        db_path = Path(os.getenv("SOLAGUARD_DATABASE_PATH", "data/bible.db"))
         
         try:
             await initialize_database(db_path)
@@ -181,6 +181,66 @@ async def get_verse(
 
 
 @mcp.tool()
+async def get_verse_context(
+    reference: str,
+    before: int = 2,
+    after: int = 2,
+    translation: str = "KJV",
+) -> dict:
+    """
+    Get a verse with surrounding context for better interpretation.
+    
+    Retrieves the requested verse plus surrounding verses to provide context
+    that aids in proper biblical interpretation. The target verse is marked
+    for easy identification.
+    
+    Args:
+        reference: Single verse reference (e.g., "John 3:16", "Romans 8:28")
+        before: Number of verses before target (default: 2, max: 10)
+        after: Number of verses after target (default: 2, max: 10)
+        translation: Translation code (KJV, BSB, etc.)
+    
+    Returns:
+        Target verse plus surrounding context, with target marked
+        
+    Example:
+        get_verse_context("John 3:16", before=2, after=2)
+        Returns John 3:14-18 with verse 16 marked as target
+    """
+    await ensure_database()
+    
+    try:
+        # Validate inputs
+        try:
+            validated_ref = await validate_biblical_reference(reference)
+            validated_translation = await validate_translation(translation)
+        except ValidationError as e:
+            return wrap_error_response(
+                e.message,
+                e.suggestion,
+                ContextType.VERSE_RETRIEVAL
+            )
+        
+        from .tools.verse_context import get_verse_context_data
+        
+        # Tool function handles the actual context retrieval
+        return await get_verse_context_data(
+            reference, 
+            before, 
+            after, 
+            validated_translation
+        )
+        
+    except Exception as e:
+        logger.error(f"get_verse_context failed: {e}")
+        return wrap_error_response(
+            str(e),
+            "Please check your reference format (e.g., 'John 3:16'). Use a single verse, not a range.",
+            ContextType.VERSE_RETRIEVAL
+        )
+
+
+@mcp.tool()
 async def search_scripture(
     query: str,
     translation: str = "KJV",
@@ -223,6 +283,176 @@ async def search_scripture(
             str(e),
             "Try simpler search terms or check spelling",
             ContextType.SCRIPTURE_SEARCH
+        )
+
+
+@mcp.tool()
+async def get_cross_references(
+    reference: str,
+    translation: str = "KJV",
+    limit: int = 10,
+) -> dict:
+    """
+    Find thematically related Bible passages with translation-agnostic logic.
+    
+    Args:
+        reference: Biblical reference (e.g., "John 3:16", "Genesis 1:1")
+        translation: Translation to return results in (KJV, BSB, etc.)
+        limit: Maximum number of cross-references to return (1-50)
+    
+    Returns:
+        Cross-reference data with Protestant theological context
+    """
+    await ensure_database()
+    
+    try:
+        # Validate inputs using centralized validation
+        try:
+            validated_ref = await validate_biblical_reference(reference)
+            validated_translation = await validate_translation(translation)
+            validated_limit = max(1, min(limit, 50))  # Clamp between 1-50
+        except ValidationError as e:
+            return wrap_error_response(
+                e.message,
+                e.suggestion,
+                ContextType.CROSS_REFERENCE
+            )
+        
+        from .tools.cross_references import get_cross_references_data
+        
+        # Tool function handles the actual cross-reference discovery
+        return await get_cross_references_data(reference, validated_translation, validated_limit)
+        
+    except Exception as e:
+        logger.error(f"get_cross_references failed: {e}")
+        return wrap_error_response(
+            str(e),
+            "Please check your reference format (e.g., 'John 3:16', 'Genesis 1:1')",
+            ContextType.CROSS_REFERENCE
+        )
+
+
+@mcp.tool()
+async def search_by_topic(
+    topic: str,
+    translation: str = "KJV",
+    limit: int = 20,
+    expand_cross_refs: bool = True,
+) -> dict:
+    """
+    Search for verses related to theological topics using semantic expansion.
+    
+    Args:
+        topic: Topic or concept to search for (e.g., "salvation", "God's love", "prayer")
+        translation: Translation to return results in (KJV, BSB, etc.)
+        limit: Maximum number of results to return (1-50)
+        expand_cross_refs: Whether to expand results using cross-references
+    
+    Returns:
+        Topical search results with theological context
+    """
+    await ensure_database()
+    
+    try:
+        # Validate inputs using centralized validation
+        try:
+            validated_translation = await validate_translation(translation)
+            validated_limit = max(1, min(limit, 50))  # Clamp between 1-50
+        except ValidationError as e:
+            return wrap_error_response(
+                e.message,
+                e.suggestion,
+                ContextType.SCRIPTURE_SEARCH
+            )
+        
+        from .tools.topical_search_db import search_by_topic_data
+        
+        # Tool function handles the actual topical search
+        return await search_by_topic_data(topic, validated_translation, validated_limit, expand_cross_refs)
+        
+    except Exception as e:
+        logger.error(f"search_by_topic failed: {e}")
+        return wrap_error_response(
+            str(e),
+            "Try common theological topics like: salvation, love, prayer, faith, grace, sin, forgiveness",
+            ContextType.SCRIPTURE_SEARCH
+        )
+
+
+@mcp.tool()
+async def get_book_info(
+    book_name: str,
+    include_stats: bool = True,
+) -> dict:
+    """
+    Retrieve comprehensive biblical book information and metadata.
+    
+    Args:
+        book_name: Book name (e.g., "Genesis", "Gen", "John", "1 Corinthians")
+        include_stats: Include chapter/verse statistics and related books
+    
+    Returns:
+        Book metadata with Protestant theological context
+    """
+    await ensure_database()
+    
+    try:
+        from .tools.book_info import get_book_info_data
+        
+        # Tool function handles the actual book info retrieval
+        return await get_book_info_data(book_name, include_stats)
+        
+    except Exception as e:
+        logger.error(f"get_book_info failed: {e}")
+        return wrap_error_response(
+            str(e),
+            "Please check the book name. Try full names (Genesis, Exodus) or common abbreviations (Gen, Ex, Matt, John)",
+            ContextType.VERSE_RETRIEVAL
+        )
+
+
+@mcp.tool()
+async def get_strongs(
+    strongs_number: str,
+    translation: str = "KJV",
+    limit: int = 20,
+) -> dict:
+    """
+    Perform Hebrew or Greek word study using Strong's Concordance numbers.
+    
+    Args:
+        strongs_number: Strong's number (e.g., "G25", "H157", "g25", "h157")
+        translation: Translation to return verse results in (KJV, BSB, etc.)
+        limit: Maximum number of verse occurrences to return (1-100)
+    
+    Returns:
+        Strong's word study data with Protestant theological context
+    """
+    await ensure_database()
+    
+    try:
+        # Validate inputs using centralized validation
+        try:
+            validated_translation = await validate_translation(translation)
+            validated_limit = max(1, min(limit, 100))  # Clamp between 1-100
+        except ValidationError as e:
+            return wrap_error_response(
+                e.message,
+                e.suggestion,
+                ContextType.STRONGS_STUDY
+            )
+        
+        from .tools.strongs_study import get_strongs_data
+        
+        # Tool function handles the actual Strong's word study
+        return await get_strongs_data(strongs_number, validated_translation, validated_limit)
+        
+    except Exception as e:
+        logger.error(f"get_strongs failed: {e}")
+        return wrap_error_response(
+            str(e),
+            "Please check your Strong's number format (e.g., 'G25', 'H157', 'g25', 'h157')",
+            ContextType.STRONGS_STUDY
         )
 
 

@@ -12,10 +12,14 @@ from .theological import (
     get_base_context,
     create_verse_theological_context,
     create_search_theological_context,
+    create_cross_reference_theological_context,
+    create_strongs_theological_context,
     create_error_context,
     wrap_response_with_context,
     wrap_verse_response,
     wrap_search_response,
+    wrap_cross_reference_response,
+    wrap_strongs_response,
     wrap_error_response,
 )
 
@@ -26,9 +30,13 @@ __all__ = [
     "get_base_context",
     "create_verse_theological_context",
     "create_search_theological_context",
+    "create_cross_reference_theological_context",
+    "create_strongs_theological_context",
     "create_error_context",
     "wrap_response_with_context",
     "wrap_verse_response",
     "wrap_search_response",
+    "wrap_cross_reference_response",
+    "wrap_strongs_response",
     "wrap_error_response",
 ]
