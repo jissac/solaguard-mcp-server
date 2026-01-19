@@ -64,11 +64,10 @@ class TestReferenceParser:
             "",
             "   ",
             "Invalid 3:16",
-            "John",
-            "John 3",
-            "John 3:",
-            "John 0:16",
-            "John 3:0",
+            "John",  # Book name only, no chapter
+            "John 3:",  # Chapter with colon but no verse
+            "John 0:16",  # Invalid chapter 0
+            "John 3:0",  # Invalid verse 0
             "John 3:16-15",  # End before start
             "Not a reference",
         ]
@@ -76,6 +75,23 @@ class TestReferenceParser:
         for invalid_ref in invalid_cases:
             with pytest.raises(ReferenceParseError):
                 parse_reference(invalid_ref)
+    
+    def test_chapter_only_references(self):
+        """Test chapter-only references (Nave's format)."""
+        # Chapter-only references are supported for Nave's topical format
+        # They return verse 1 of that chapter
+        test_cases = [
+            ("John 3", "JHN", 3, 1),
+            ("DEU 29", "DEU", 29, 1),
+            ("JOS 4", "JOS", 4, 1),
+        ]
+        
+        for ref_str, expected_book, expected_chapter, expected_verse in test_cases:
+            result = parse_reference(ref_str)
+            assert isinstance(result, VerseReference)
+            assert result.book_id == expected_book
+            assert result.chapter == expected_chapter
+            assert result.verse == expected_verse
     
     def test_format_reference(self):
         """Test reference formatting."""

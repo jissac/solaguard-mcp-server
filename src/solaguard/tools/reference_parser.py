@@ -195,7 +195,15 @@ def parse_reference(reference: str) -> Union[VerseReference, VerseRange]:
     Raises:
         ReferenceParseError: If reference format is invalid
     """
-    if not reference or not reference.strip():
+    # Validate input
+    if not reference:
+        raise ReferenceParseError("Empty reference")
+    
+    if not isinstance(reference, str):
+        raise ReferenceParseError(f"Reference must be a string, got {type(reference).__name__}")
+    
+    reference = reference.strip()
+    if not reference:
         raise ReferenceParseError("Empty reference")
     
     reference = reference.strip()

@@ -40,8 +40,12 @@ async def search_scripture_data(
         ScriptureSearchError: If search fails
     """
     try:
+        # Validate query
+        if not query or not query.strip():
+            raise ScriptureSearchError("Empty or invalid search query")
+        
         # Query is already validated and sanitized at server level
-        sanitized_query = query
+        sanitized_query = query.strip()
         
         # Get database manager
         db_manager = get_database_manager()
@@ -110,7 +114,25 @@ async def _execute_fts5_search(
         cursor = await conn.execute(search_sql, (query, translation, limit))
         rows = await cursor.fetchall()
         
-        return [dict(row) for row in rows]
+        # Convert rows to dictionaries manually
+        results = []
+        for row in rows:
+            results.append({
+                "id": row[0],
+                "book_id": row[1],
+                "chapter": row[2],
+                "verse": row[3],
+                "text": row[4],
+                "book_name": row[5],
+                "testament": row[6],
+                "author": row[7],
+                "genre": row[8],
+                "canonical_order": row[9],
+                "relevance_score": row[10],
+                "snippet": row[11]
+            })
+        
+        return results
 
 
 async def _get_search_metadata(
@@ -162,7 +184,8 @@ async def _get_search_metadata(
                 books_found
             )
             rows = await cursor.fetchall()
-            book_names = {row["id"]: row["name"] for row in rows}
+            # Convert tuples to dict manually
+            book_names = {row[0]: row[1] for row in rows}
         else:
             book_names = {}
     

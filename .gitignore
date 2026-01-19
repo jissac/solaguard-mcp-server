@@ -169,8 +169,14 @@ data/bible.db
 data/bible.db-*
 data/*.sqlite
 data/*.sqlite3
+data/lexicon
+data/cross_references
+data/naves_topical
 logs/
 *.log
+
+# Kiro specs folder (development only)
+.kiro/
 
 # Lexicon data files (too many for git)
 data/lexicon/greek/*.md

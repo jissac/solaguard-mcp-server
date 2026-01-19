@@ -31,6 +31,7 @@ async def get_verse_data(
     reference: str,
     translation: str = "KJV",
     include_interlinear: bool = False,
+    include_definitions: bool = False,
 ) -> Dict:
     """
     Retrieve specific Bible verses with theological context.
@@ -38,7 +39,8 @@ async def get_verse_data(
     Args:
         reference: Biblical reference (e.g., "John 3:16", "Romans 8:28-30")
         translation: Translation code (KJV, WEB, TR, WH, BYZ, MT, WLC)
-        include_interlinear: Include word-level Greek/Hebrew data (Phase 2)
+        include_interlinear: Include word-level Greek/Hebrew data with Strong's numbers
+        include_definitions: Include Strong's definitions for each word (only with interlinear)
     
     Returns:
         Verse data with Protestant theological context
@@ -65,6 +67,16 @@ async def get_verse_data(
                 "The reference exists but no verse text is available in this translation",
                 ContextType.VERSE_RETRIEVAL
             )
+        
+        # Fetch interlinear data if requested
+        if include_interlinear:
+            for verse in verses:
+                interlinear_words = await _get_interlinear_data(
+                    db_manager, 
+                    verse["id"],
+                    include_definitions=include_definitions
+                )
+                verse["interlinear_words"] = interlinear_words
         
         # Get book metadata
         book_metadata = await _get_book_metadata(db_manager, parsed_ref.book_id)
@@ -106,6 +118,85 @@ async def _get_single_verse(db_manager, verse_ref: VerseReference, translation: 
         if row:
             return [dict(row)]
         return []
+
+
+async def _get_interlinear_data(db_manager, verse_id: int, include_definitions: bool = False) -> List[Dict]:
+    """Retrieve word-level interlinear data for a verse."""
+    async with db_manager.get_connection() as conn:
+        # Build query based on whether definitions are needed
+        if include_definitions:
+            query = """
+                SELECT 
+                    w.sequence,
+                    w.text,
+                    w.normalized,
+                    w.strongs,
+                    w.morphology,
+                    w.english_equiv,
+                    COALESCE(w.transliteration, sd.transliteration) as transliteration,
+                    sd.word as original_word,
+                    sd.pronunciation,
+                    sd.definition,
+                    sd.part_of_speech
+                FROM words w
+                LEFT JOIN strongs_dictionary sd ON w.strongs = sd.number
+                WHERE w.verse_id = ?
+                ORDER BY w.sequence
+            """
+        else:
+            query = """
+                SELECT 
+                    w.sequence,
+                    w.text,
+                    w.normalized,
+                    w.strongs,
+                    w.morphology,
+                    w.english_equiv,
+                    COALESCE(w.transliteration, sd.transliteration) as transliteration,
+                    sd.word as original_word,
+                    sd.pronunciation
+                FROM words w
+                LEFT JOIN strongs_dictionary sd ON w.strongs = sd.number
+                WHERE w.verse_id = ?
+                ORDER BY w.sequence
+            """
+        
+        cursor = await conn.execute(query, (verse_id,))
+        
+        rows = await cursor.fetchall()
+        words = []
+        for row in rows:
+            word_data = {
+                "sequence": row[0],
+                "text": row[1],
+                "english": row[5] if row[5] else row[1],  # Use english_equiv or fallback to text
+            }
+            
+            # Add optional fields only if they exist
+            if row[3]:  # strongs
+                word_data["strongs"] = row[3]
+            if row[6]:  # transliteration (from join or words table)
+                word_data["transliteration"] = row[6]
+            if row[7]:  # original_word (Hebrew/Greek from Strong's)
+                word_data["original"] = row[7]
+            if row[8]:  # pronunciation
+                word_data["pronunciation"] = row[8]
+            
+            # Add definition and part of speech if requested and available
+            if include_definitions and len(row) > 9:
+                if row[9]:  # definition
+                    word_data["definition"] = row[9]
+                if row[10]:  # part_of_speech
+                    word_data["part_of_speech"] = row[10]
+            
+            if row[2]:  # normalized
+                word_data["normalized"] = row[2]
+            if row[4]:  # morphology
+                word_data["morphology"] = row[4]
+            
+            words.append(word_data)
+        
+        return words
 
 
 async def _get_verse_range(db_manager, verse_range: VerseRange, translation: str) -> List[Dict]:
@@ -174,12 +265,19 @@ def _format_verse_response(
             "text": verse_data["text"],
         }
         
-        # Add interlinear data if requested (Phase 2 - placeholder for now)
-        if include_interlinear:
-            verse_info["interlinear"] = {
-                "note": "Interlinear data will be available in Phase 2",
-                "words": []
-            }
+        # Add interlinear data if requested and available
+        if include_interlinear and "interlinear_words" in verse_data:
+            if verse_data["interlinear_words"]:
+                verse_info["interlinear"] = {
+                    "available": True,
+                    "word_count": len(verse_data["interlinear_words"]),
+                    "words": verse_data["interlinear_words"]
+                }
+            else:
+                verse_info["interlinear"] = {
+                    "available": False,
+                    "note": "Interlinear data not available for this verse"
+                }
         
         formatted_verses.append(verse_info)
     
@@ -210,6 +308,7 @@ def _format_verse_response(
             "translation": translation,
             "passage_type": passage_type,
             "verse_count": len(formatted_verses),
+            "interlinear_included": include_interlinear,
             "book_metadata": {
                 "testament": book_metadata.get("testament", "Unknown"),
                 "author": book_metadata.get("author", "Unknown"),

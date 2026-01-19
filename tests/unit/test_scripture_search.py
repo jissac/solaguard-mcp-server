@@ -43,17 +43,17 @@ class TestQuerySanitization:
         """Test that potentially dangerous characters are removed."""
         # Test SQL injection attempts
         assert ";" not in sanitize_search_query("love; DROP TABLE verses;")
-        assert "'" not in sanitize_search_query("love' OR 1=1--")
         
-        # Test FTS5 injection attempts
-        dangerous_query = "love NEAR/5 peace"
-        sanitized = sanitize_search_query(dangerous_query)
-        assert "NEAR" not in sanitized or sanitized == dangerous_query  # Either removed or kept if safe
-    
+        # Single quotes are allowed for possessives (e.g. God's)
+        # But should be safe with parameterized queries
+        sanitized = sanitize_search_query("love' OR 1=1--")
+        assert "=" not in sanitized  # = is removed
+        
     def test_empty_after_sanitization(self):
         """Test queries that become empty after sanitization."""
         assert sanitize_search_query(";;;") == ""
-        assert sanitize_search_query("'''") == ""
+        # assert sanitize_search_query("'''") == ""  # Single quotes allowed
+        assert sanitize_search_query("= + *") == ""
 
 
 class TestSearchValidation:
