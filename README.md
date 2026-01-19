@@ -21,7 +21,7 @@ Transform AI conversations with automatic Protestant theological framing, ensuri
 - **Book Information**: Comprehensive biblical book metadata (`get_book_info`)
 
 ### Data Infrastructure
-- **Complete Bible Texts**: KJV, BSB
+- **Complete Bible Texts**: KJV, BSB, and multiple translations
 - **Strong's Dictionary**: 14,197 Greek/Hebrew lexicon entries with definitions
 - **Cross-References**: 317,516 traditional cross-references for thematic study
 - **Nave's Topical Bible**: 5,500+ curated topics with 100,000+ verse references
@@ -302,6 +302,21 @@ Every response includes Protestant theological framing:
 - **Input Validation**: Comprehensive validation for all tool parameters
 - **Error Handling**: Graceful error recovery with helpful suggestions
 
+### Current Status
+
+**Production-Ready Features:**
+- ✅ 8 fully functional MCP tools
+- ✅ Complete biblical research infrastructure
+- ✅ Rate limiting and input validation
+- ✅ Protestant theological framing
+- ✅ Real production data (no mock data)
+
+**In Progress:**
+- 🚧 Unit and integration tests
+- 🚧 Docker containerization
+- 🚧 Hosted deployment
+- 🚧 Client setup documentation
+
 ## 🌍 Deployment
 
 ### Current Status: Local Development
@@ -373,29 +388,17 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- **Public Domain Texts**: KJV (1769), Berean Standard Bible
-- **Strong's Dictionary**: 14,197 Greek and Hebrew lexicon entries
-- **Cross-References**: 317,516 traditional cross-references from OpenBible.info
-- **Nave's Topical Bible**: 5,500+ curated topics from public domain
+- **Public Domain Texts**: KJV (1769), World English Bible, Textus Receptus, Westminster Leningrad Codex
 - **FastMCP Framework**: For reliable MCP protocol implementation
 - **Christian Developer Community**: For feedback and contributions
 - **Sola Scriptura**: Scripture alone as ultimate authority
 
-## 📊 Project Statistics
-
-- **8 MCP Tools**: Complete biblical research toolkit
-- **790,829 Words**: With Strong's numbers and interlinear data
-- **14,197 Lexicon Entries**: Greek and Hebrew Strong's dictionary
-- **317,516 Cross-References**: Traditional thematic connections
-- **5,500+ Topics**: Nave's Topical Bible integration
-- **100,000+ Verse References**: Organized by theological topics
-- **66 Books**: Complete Protestant canon with metadata
-
 ## 📞 Support
 
 - **Documentation**: [docs.solaguard.com](https://docs.solaguard.com)
-- **Issues**: [GitHub Issues](https://github.com/jissac/solaguard-mcp-server/issues)
-
+- **Issues**: [GitHub Issues](https://github.com/solaguard/solaguard-mcp/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/solaguard/solaguard-mcp/discussions)
+- **Email**: contact@solaguard.com
 
 ---
 

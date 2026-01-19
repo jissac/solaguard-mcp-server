@@ -79,6 +79,63 @@ def setup_rate_limiting():
         _http_app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
         logger.info("✅ Exception handler added")
         
+        # Add health check endpoint for container orchestration
+        @_http_app.get("/health")
+        async def health_check():
+            """Health check endpoint for Docker, Kubernetes, and hosting platforms."""
+            try:
+                # Check if database is accessible
+                db_status = "unknown"
+                db_path = Path(os.getenv("SOLAGUARD_DATABASE_PATH", "data/bible.db"))
+                
+                if db_path.exists():
+                    # Try to query database
+                    try:
+                        await ensure_database()
+                        db_manager = get_database_manager()
+                        async with db_manager.get_connection() as conn:
+                            cursor = await conn.execute("SELECT COUNT(*) FROM verses LIMIT 1")
+                            await cursor.fetchone()
+                        db_status = "connected"
+                    except Exception as e:
+                        logger.error(f"Database health check failed: {e}")
+                        db_status = "error"
+                else:
+                    db_status = "missing"
+                
+                # Determine overall health
+                is_healthy = db_status == "connected"
+                status_code = 200 if is_healthy else 503
+                
+                return JSONResponse(
+                    status_code=status_code,
+                    content={
+                        "status": "healthy" if is_healthy else "unhealthy",
+                        "service": "SolaGuard MCP Server",
+                        "version": "0.1.0",
+                        "database": {
+                            "status": db_status,
+                            "path": str(db_path)
+                        },
+                        "features": {
+                            "mcp_tools": 8,
+                            "rate_limiting": "enabled",
+                            "theological_context": "enabled"
+                        }
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Health check failed: {e}")
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "status": "unhealthy",
+                        "error": str(e)
+                    }
+                )
+        
+        logger.info("✅ Health check endpoint added at /health")
+        
         # Add rate limiting middleware using the new approach
         from starlette.middleware.base import BaseHTTPMiddleware
         
@@ -132,6 +189,11 @@ async def ensure_database():
             logger.info("💡 Run 'python scripts/generate_mock_data.py' to create test database")
             raise
     
+    return _db_manager
+
+
+def get_database_manager():
+    """Get the global database manager instance."""
     return _db_manager
 
 
